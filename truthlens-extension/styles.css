@@ -43,7 +43,7 @@
 }
 
 .truthlens-unverifiable .truthlens-icon-question {
-  fill: rgb(113, 118, 123) !important;
+  fill: rgb(29, 155, 240) !important;
 }
 
 /* Keep status colors on hover */
@@ -60,7 +60,7 @@
 }
 
 .truthlens-unverifiable:hover .truthlens-icon-question {
-  fill: rgb(113, 118, 123) !important;
+  fill: rgb(29, 155, 240) !important;
 }
 
 /* Loading state */
