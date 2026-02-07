@@ -30,9 +30,13 @@ app.add_middleware(
 # Initialize API clients
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
+HIVE_API_KEY = os.getenv("HIVE_API_KEY")
 
 if not GEMINI_API_KEY or not BRAVE_API_KEY:
     raise ValueError("Missing API keys. Set GEMINI_API_KEY and BRAVE_API_KEY environment variables.")
+
+if not HIVE_API_KEY:
+    print("⚠️  HIVE_API_KEY not set - AI media detection will be unavailable")
 
 print("✓ API keys loaded")
 
@@ -68,6 +72,18 @@ class FactCheckResponse(BaseModel):
     sources: List[Source]
     confidence: float  # 0.0 to 1.0 (internal only)
     bias: Optional[str] = None  # Neutral / High / Loaded
+
+
+class MediaCheckRequest(BaseModel):
+    media_url: str
+    media_type: str  # "image" or "video"
+
+
+class MediaCheckResponse(BaseModel):
+    ai_generated: bool
+    confidence: float
+    media_type: str
+    message: str
 
 
 @app.get("/")
@@ -355,6 +371,77 @@ CONFIDENCE: [0.0 - 1.0]
             sources=[],
             confidence=0.0
         )
+
+
+@app.post("/api/check-media", response_model=MediaCheckResponse)
+async def check_media(request: MediaCheckRequest):
+    """
+    Check if an image or video is AI-generated using Hive API.
+    """
+    if not HIVE_API_KEY:
+        raise HTTPException(status_code=503, detail="AI media detection service not configured")
+    
+    try:
+        print(f"Checking {request.media_type}: {request.media_url[:100]}...")
+        check_start = time.time()
+        
+        # Call Hive API
+        url = "https://api.thehive.ai/api/v2/task/sync"
+        headers = {
+            "Authorization": f"Token {HIVE_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "url": request.media_url,
+            "classes": ["ai_generated"]
+        }
+        
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            executor,
+            lambda: requests.post(url, headers=headers, json=payload, timeout=30)
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        check_time = time.time() - check_start
+        print(f"⏱️  Hive AI check took: {check_time:.2f}s")
+        
+        # Parse Hive response
+        ai_generated = False
+        confidence = 0.0
+        
+        if "status" in data and data["status"][0]["response"]["output"]:
+            classes = data["status"][0]["response"]["output"][0]["classes"]
+            for cls in classes:
+                if cls["class"] == "ai_generated":
+                    confidence = cls["score"]
+                    ai_generated = confidence > 0.5
+                    break
+        
+        # Determine message
+        if ai_generated:
+            if confidence > 0.8:
+                message = "Likely AI-generated"
+            else:
+                message = "Possibly AI-generated"
+        else:
+            if confidence < 0.2:
+                message = "Likely authentic"
+            else:
+                message = "Uncertain"
+        
+        return MediaCheckResponse(
+            ai_generated=ai_generated,
+            confidence=confidence,
+            media_type=request.media_type,
+            message=message
+        )
+        
+    except Exception as e:
+        print(f"Error checking media: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Media check error: {str(e)}")
 
 
 if __name__ == "__main__":

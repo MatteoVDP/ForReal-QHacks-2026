@@ -286,6 +286,13 @@ function showFactCheckResult(tweet, result) {
     biasHTML = `<div class="truthlens-bias">⚠️ ${biasLevel} detected in this post</div>`;
   }
   
+  // Detect if tweet has media
+  const hasMedia = tweet.querySelector('[data-testid="tweetPhoto"], [data-testid="tweetVideo"]');
+  let mediaCheckHTML = '';
+  if (hasMedia) {
+    mediaCheckHTML = '<button class="truthlens-media-check-btn">🤖 Check if AI-generated</button><div class="truthlens-media-result"></div>';
+  }
+  
   overlay.innerHTML = `
     <div class="truthlens-header">
       <span class="truthlens-label truthlens-label-${labelClass}">${result.label}</span>
@@ -295,6 +302,7 @@ function showFactCheckResult(tweet, result) {
       ${biasHTML}
       <p class="truthlens-explanation">${result.explanation}</p>
       ${sourcesHTML}
+      ${mediaCheckHTML}
     </div>
   `;
   
@@ -323,6 +331,50 @@ function showFactCheckResult(tweet, result) {
     e.preventDefault();
     overlay.remove();
   });
+  
+  // Add media check button functionality
+  const mediaCheckBtn = overlay.querySelector('.truthlens-media-check-btn');
+  if (mediaCheckBtn) {
+    mediaCheckBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      const resultDiv = overlay.querySelector('.truthlens-media-result');
+      resultDiv.innerHTML = '<div class="truthlens-loading-small">Checking...</div>';
+      
+      try {
+        // Extract media URL
+        const mediaElement = tweet.querySelector('[data-testid="tweetPhoto"] img, [data-testid="tweetVideo"] video');
+        if (!mediaElement) {
+          resultDiv.innerHTML = '<div class="truthlens-error">Could not find media</div>';
+          return;
+        }
+        
+        const mediaUrl = mediaElement.src || mediaElement.poster;
+        const mediaType = mediaElement.tagName.toLowerCase() === 'video' ? 'video' : 'image';
+        
+        // Call backend
+        const response = await fetch(`${API_ENDPOINT.replace('/fact-check', '/check-media')}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ media_url: mediaUrl, media_type: mediaType })
+        });
+        
+        if (!response.ok) throw new Error('Media check failed');
+        
+        const data = await response.json();
+        
+        // Display result
+        const icon = data.ai_generated ? '🤖' : '✅';
+        const confidencePercent = Math.round(data.confidence * 100);
+        resultDiv.innerHTML = `<div class="truthlens-media-result-text">${icon} ${data.message} (${confidencePercent}% confidence)</div>`;
+        
+      } catch (error) {
+        console.error('Media check error:', error);
+        resultDiv.innerHTML = '<div class="truthlens-error">Check failed. Try again.</div>';
+      }
+    });
+  }
   
   // Find tweet text container and append below it
   const tweetTextContainer = tweet.querySelector('[data-testid="tweetText"]');

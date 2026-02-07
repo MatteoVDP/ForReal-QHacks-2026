@@ -248,3 +248,45 @@
   color: rgb(113, 118, 123);
   font-style: italic;
 }
+
+/* Media check button */
+.truthlens-media-check-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: rgb(29, 155, 240);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.truthlens-media-check-btn:hover {
+  background: rgb(26, 140, 216);
+}
+
+.truthlens-media-result {
+  margin-top: 8px;
+  min-height: 20px;
+}
+
+.truthlens-media-result-text {
+  padding: 8px 12px;
+  background: rgb(247, 249, 249);
+  border-radius: 8px;
+  font-size: 14px;
+  color: rgb(15, 20, 25);
+}
+
+.truthlens-loading-small {
+  font-size: 13px;
+  color: rgb(113, 118, 123);
+  font-style: italic;
+}
+
+.truthlens-error {
+  font-size: 13px;
+  color: rgb(249, 24, 128);
+}
