@@ -43,7 +43,7 @@ brave_api_key = BRAVE_API_KEY
 print("✓ Brave API key loaded")
 
 # Create Gemini model instance
-model = genai.GenerativeModel('gemini-3-flash-preview')
+model = genai.GenerativeModel('gemini-2.0-flash-lite')
 print("✓ Gemini model configured")
 
 # Thread pool for async operations
@@ -66,7 +66,8 @@ class FactCheckResponse(BaseModel):
     label: str  # True, False, Misleading, Unverifiable
     explanation: str
     sources: List[Source]
-    confidence: float  # 0.0 to 1.0
+    confidence: float  # 0.0 to 1.0 (internal only)
+    bias: Optional[str] = None  # Neutral / High / Loaded
 
 
 @app.get("/")
@@ -132,12 +133,28 @@ async def extract_claim(tweet_text: str) -> str:
     """
     Use Gemini to extract the core factual claim from a tweet.
     """
-    prompt = f"""
-Extract the main verifiable claim from this tweet. If no verifiable claim exists, respond "No verifiable claim".
+    prompt = prompt = f"""
+<context>
+ROLE: Forensic Linguist / Search Architect.
+OBJECTIVE: Convert messy social media text into a high-signal atomic claim for verification.
+</context>
 
-Tweet: "{tweet_text}"
+<task>
+EXTRACT the primary, verifiable claim from the TWEET below.
+- Prioritize: Proper Nouns, Dates, Statistics, and Specific Events.
+- Discard: Adjectives, hashtags, emojis, and emotional framing.
+</task>
 
-Claim (max 2 sentences):
+<constraints>
+- Output ONLY the claim. 
+- Max 12 words.
+- If no verifiable claim exists, output "No verifiable claim".
+- Reasoning Effort: Minimal (Direct output only).
+</constraints>
+
+<tweet_text>
+"{tweet_text}"
+</tweet_text>
 """
     
     try:
@@ -232,26 +249,51 @@ async def synthesize_fact_check(claim: str, original_tweet: str, search_results:
         for i, result in enumerate(search_results[:5])
     ])
     
-    prompt = f"""
-Analyze this claim against these sources. Determine: TRUE, FALSE, MISLEADING, or UNVERIFIABLE.
+    prompt = prompt = f"""
+<context>
+ROLE: Senior Fact-Checker.
+TASK: Verify the CLAIM against the provided SEARCH_EVIDENCE.
+</context>
 
-Claim: "{claim}"
-
-Sources:
+<search_evidence>
 {sources_text}
+</search_evidence>
 
-Format:
+<claim>
+"{claim}"
+</claim>
+
+<instructions>
+1. CROSS-REFERENCE: Does the evidence mention the specific entities in the claim?
+2. VERIFY: Label based on direct evidence matches.
+   - TRUE: Supported by multiple reputable sources.
+   - FALSE: Contradicted by primary sources.
+   - MISLEADING: Grain of truth but significant omission/bias.
+   - UNVERIFIABLE: Claim entities not found in sources.
+3. POLITICAL BIAS CHECK (for misleading/controversial claims only):
+   - Analyze ONLY the tweet content (not the sources)
+   - Detect if the framing shows political bias or partisan slant
+   - Do NOT label as left/right/center - only detect if bias exists
+   - Consider: selective facts, partisan framing, political agenda
+</instructions>
+
+<output_format>
 LABEL: [TRUE/FALSE/MISLEADING/UNVERIFIABLE]
-EXPLANATION: [1-2 sentences]
-CONFIDENCE: [0.0-1.0]
+EXPLANATION: [Context + Source Name in < 20 words]
+BIAS: [None / Potential / Likely]
+CONFIDENCE: [0.0 - 1.0]
+</output_format>
 """
     
     try:
         loop = asyncio.get_event_loop()
+        gemini_start = time.time()
         response = await loop.run_in_executor(
             executor,
             lambda: model.generate_content(prompt)
         )
+        gemini_time = time.time() - gemini_start
+        print(f"⏱️  Gemini API call took: {gemini_time:.2f}s")
         
         # Parse the response
         response_text = response.text.strip()
@@ -260,6 +302,7 @@ CONFIDENCE: [0.0-1.0]
         label = "Unverifiable"
         explanation = "Unable to determine accuracy."
         confidence = 0.5
+        bias = None
         
         for line in lines:
             if line.startswith("LABEL:"):
@@ -277,6 +320,8 @@ CONFIDENCE: [0.0-1.0]
                 explanation = line.replace("EXPLANATION:", "").strip()
                 # Remove markdown formatting
                 explanation = explanation.replace("**", "").replace("__", "").replace("*", "").replace("_", "")
+            elif line.startswith("BIAS:"):
+                bias = line.replace("BIAS:", "").strip()
             elif line.startswith("CONFIDENCE:"):
                 try:
                     confidence = float(line.replace("CONFIDENCE:", "").strip())
@@ -298,7 +343,8 @@ CONFIDENCE: [0.0-1.0]
             label=label,
             explanation=explanation,
             sources=sources,
-            confidence=confidence
+            confidence=confidence,
+            bias=bias
         )
         
     except Exception as e:

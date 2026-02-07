@@ -285,15 +285,22 @@ function showFactCheckResult(tweet, result) {
     sourcesHTML += '</div>';
   }
   
+  // Show bias warning only for misleading claims with detected bias
+  let biasHTML = '';
+  if (result.label.toLowerCase() === 'misleading' && result.bias && result.bias.toLowerCase() !== 'none') {
+    const biasLevel = result.bias.toLowerCase() === 'likely' ? 'Likely bias' : 'Potential bias';
+    biasHTML = `<div class="truthlens-bias">⚠️ ${biasLevel} detected in this post</div>`;
+  }
+  
   overlay.innerHTML = `
     <div class="truthlens-header">
       <span class="truthlens-label truthlens-label-${labelClass}">${result.label}</span>
-      <button class="truthlens-close">&times;</button>
+      <button class="truthlens-close">×</button>
     </div>
-    <div class="truthlens-content">
+    <div class="truthlens-body">
+      ${biasHTML}
       <p class="truthlens-explanation">${result.explanation}</p>
       ${sourcesHTML}
-      ${result.confidence ? `<div class="truthlens-confidence">Confidence: ${Math.round(result.confidence * 100)}%</div>` : ''}
     </div>
   `;
   
