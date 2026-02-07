@@ -58,6 +58,7 @@ class Source(BaseModel):
     title: str
     url: str
     snippet: Optional[str] = None
+    published_date: Optional[str] = None
 
 
 class FactCheckResponse(BaseModel):
@@ -146,7 +147,7 @@ Claim (max 2 sentences):
 
 async def search_claim(claim: str) -> List[dict]:
     """
-    Search for sources using Exa API.
+    Search for sources using Exa API with optimized parameters for fact-checking.
     """
     try:
         loop = asyncio.get_event_loop()
@@ -155,10 +156,23 @@ async def search_claim(claim: str) -> List[dict]:
             lambda: exa_client.search_and_contents(
                 query=claim,
                 num_results=3,
-                use_autoprompt=True,
-                text={"max_characters": 500},
-                include_domains=["reuters.com", "apnews.com", "bbc.com", "snopes.com", 
-                                "factcheck.org", "politifact.com", "npr.org"]
+                use_autoprompt=True,  # Exa optimizes the query
+                type="keyword",  # Use keyword search for factual queries
+                text={
+                    "max_characters": 800,  # More context
+                    "include_html_tags": False
+                },
+                highlights={
+                    "num_sentences": 3,  # Get most relevant sentences
+                    "highlights_per_url": 1
+                },
+                # Expanded trusted domains beyond original 7
+                include_domains=[
+                    "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk",
+                    "snopes.com", "factcheck.org", "politifact.com", 
+                    "npr.org", "theguardian.com", "nytimes.com",
+                    "washingtonpost.com", "cnn.com", "nbcnews.com"
+                ]
             )
         )
         
@@ -168,7 +182,8 @@ async def search_claim(claim: str) -> List[dict]:
             results.append({
                 "title": result.title,
                 "url": result.url,
-                "content": result.text if hasattr(result, 'text') else ""
+                "content": result.text if hasattr(result, 'text') else "",
+                "published_date": result.published_date if hasattr(result, 'published_date') else None
             })
         return results
     except Exception as e:
@@ -231,7 +246,8 @@ CONFIDENCE: [0.0-1.0]
             Source(
                 title=result.get("title", "Source"),
                 url=result.get("url", ""),
-                snippet=result.get("content", "")[:200]
+                snippet=result.get("content", "")[:200],
+                published_date=result.get("published_date")
             )
             for result in search_results[:3]  # Top 3 sources
         ]

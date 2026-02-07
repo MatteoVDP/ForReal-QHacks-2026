@@ -278,7 +278,8 @@ function showFactCheckResult(tweet, result) {
   if (result.sources && result.sources.length > 0) {
     sourcesHTML = '<div class="truthlens-sources">';
     result.sources.forEach(source => {
-      sourcesHTML += `<a href="${source.url}" target="_blank" rel="noopener noreferrer">${source.title || source.url}</a>`;
+      const dateStr = source.published_date ? `<span class="truthlens-date">${new Date(source.published_date).toLocaleDateString()}</span> ` : '';
+      sourcesHTML += `<div class="truthlens-source-item">${dateStr}<a href="${source.url}" target="_blank" rel="noopener noreferrer" class="truthlens-source-link">${source.title || source.url}</a></div>`;
     });
     sourcesHTML += '</div>';
   }
@@ -297,6 +298,10 @@ function showFactCheckResult(tweet, result) {
   
   // Stop all event propagation on the overlay
   overlay.addEventListener('click', (e) => {
+    // Allow links to work
+    if (e.target.classList.contains('truthlens-source-link') || e.target.tagName === 'A') {
+      return; // Let the link click through
+    }
     e.stopPropagation();
     e.preventDefault();
   });
