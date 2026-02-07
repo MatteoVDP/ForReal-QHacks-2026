@@ -88,9 +88,45 @@
   fill: rgb(29, 155, 240) !important;
 }
 
-/* Loading state */
+/* Loading state - smoothly hide icon and show pulsing dot */
 .truthlens-loading .truthlens-icon {
-  animation: truthlens-spin 1s linear infinite;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Loading dots container */
+.truthlens-loading {
+  position: relative;
+}
+
+/* Single pulsing dot */
+.truthlens-loading::before {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(113, 118, 123);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: truthlens-dot-pulse 1.2s infinite ease-in-out;
+}
+
+.truthlens-loading::after {
+  display: none;
+}
+
+@keyframes truthlens-dot-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
 }
 
 @keyframes truthlens-spin {
