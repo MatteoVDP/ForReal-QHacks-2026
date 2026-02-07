@@ -66,7 +66,8 @@ class FactCheckResponse(BaseModel):
     label: str  # True, False, Misleading, Unverifiable
     explanation: str
     sources: List[Source]
-    confidence: float  # 0.0 to 1.0
+    confidence: float  # 0.0 to 1.0 (internal only)
+    bias: Optional[str] = None  # Neutral / High / Loaded
 
 
 @app.get("/")
@@ -269,23 +270,30 @@ TASK: Verify the CLAIM against the provided SEARCH_EVIDENCE.
    - FALSE: Contradicted by primary sources.
    - MISLEADING: Grain of truth but significant omission/bias.
    - UNVERIFIABLE: Claim entities not found in sources.
-3. BIAS CHECK: Briefly note if the original framing used "outrage-bait" or logical fallacies.
+3. POLITICAL BIAS CHECK (for misleading/controversial claims only):
+   - Analyze ONLY the tweet content (not the sources)
+   - Detect if the framing shows political bias or partisan slant
+   - Do NOT label as left/right/center - only detect if bias exists
+   - Consider: selective facts, partisan framing, political agenda
 </instructions>
 
 <output_format>
 LABEL: [TRUE/FALSE/MISLEADING/UNVERIFIABLE]
 EXPLANATION: [Context + Source Name in < 20 words]
-BIAS: [Neutral / High / Loaded]
+BIAS: [None / Potential / Likely]
 CONFIDENCE: [0.0 - 1.0]
 </output_format>
 """
     
     try:
         loop = asyncio.get_event_loop()
+        gemini_start = time.time()
         response = await loop.run_in_executor(
             executor,
             lambda: model.generate_content(prompt)
         )
+        gemini_time = time.time() - gemini_start
+        print(f"⏱️  Gemini API call took: {gemini_time:.2f}s")
         
         # Parse the response
         response_text = response.text.strip()
@@ -294,6 +302,7 @@ CONFIDENCE: [0.0 - 1.0]
         label = "Unverifiable"
         explanation = "Unable to determine accuracy."
         confidence = 0.5
+        bias = None
         
         for line in lines:
             if line.startswith("LABEL:"):
@@ -311,6 +320,8 @@ CONFIDENCE: [0.0 - 1.0]
                 explanation = line.replace("EXPLANATION:", "").strip()
                 # Remove markdown formatting
                 explanation = explanation.replace("**", "").replace("__", "").replace("*", "").replace("_", "")
+            elif line.startswith("BIAS:"):
+                bias = line.replace("BIAS:", "").strip()
             elif line.startswith("CONFIDENCE:"):
                 try:
                     confidence = float(line.replace("CONFIDENCE:", "").strip())
@@ -332,7 +343,8 @@ CONFIDENCE: [0.0 - 1.0]
             label=label,
             explanation=explanation,
             sources=sources,
-            confidence=confidence
+            confidence=confidence,
+            bias=bias
         )
         
     except Exception as e:
