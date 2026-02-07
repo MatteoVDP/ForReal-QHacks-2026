@@ -1,4 +1,4 @@
-"""AI media detection service using Hive API."""
+"""AI media detection service using AI or Not API."""
 import requests
 import asyncio
 import time
@@ -16,7 +16,7 @@ class MediaCheckService:
     @staticmethod
     async def check_media(media_url: str, media_type: str) -> MediaCheckResponse:
         """
-        Check if an image or video is AI-generated using Hive API.
+        Check if an image or video is AI-generated using AI or Not API.
         
         Args:
             media_url: URL of the image or video
@@ -25,71 +25,70 @@ class MediaCheckService:
         Returns:
             MediaCheckResponse with ai_generated status, confidence, and message
         """
-        if not settings.HIVE_API_KEY:
-            raise ValueError("HIVE_API_KEY not configured")
+        if not settings.AIORNOT_API_KEY:
+            raise ValueError("AIORNOT_API_KEY not configured")
         
         try:
             print(f"Checking {media_type}: {media_url[:100]}...")
             check_start = time.time()
             
-            # Hive API expects 'token' in lowercase and the key directly
+            # AI or Not API uses simple Bearer token authentication
             headers = {
-                "Authorization": f"token {settings.HIVE_API_KEY}",
-                "Content-Type": "application/json",
-                "Accept": "application/json"
+                "Authorization": f"Bearer {settings.AIORNOT_API_KEY.strip()}",
+                "Content-Type": "application/json"
             }
             
+            # AI or Not payload format
             payload = {
-                "url": media_url,
-                "classes": ["ai_generated"]
+                "object": media_url
             }
             
-            print(f"🔑 Using API key: {settings.HIVE_API_KEY[:10]}...")
+            print(f"🔑 Using AI or Not API")
             print(f"📤 Request payload: {payload}")
+            print(f"🌐 Endpoint: {settings.AIORNOT_API_URL}")
             
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 executor,
                 lambda: requests.post(
-                    settings.HIVE_API_URL,
+                    settings.AIORNOT_API_URL,
                     headers=headers,
                     json=payload,
-                    timeout=settings.HIVE_TIMEOUT
+                    timeout=settings.AIORNOT_TIMEOUT
                 )
             )
             
             print(f"📥 Response status: {response.status_code}")
-            print(f"📥 Response headers: {response.headers}")
             
             if response.status_code == 403:
                 print("❌ 403 Forbidden - API key might be invalid")
                 print(f"Response body: {response.text[:500]}")
-                raise ValueError(f"Hive API authentication failed. Please check your API key. Response: {response.text[:200]}")
+                raise ValueError(f"AI or Not API authentication failed. Please check your API key.")
+            
+            if response.status_code == 400:
+                print("❌ 400 Bad Request - Invalid payload")
+                print(f"Response body: {response.text}")
+                raise ValueError(f"AI or Not API bad request. Response: {response.text}")
             
             response.raise_for_status()
             data = response.json()
             print(f"✓ Response data received: {data}")
             
             check_time = time.time() - check_start
-            print(f"⏱️  Hive AI check took: {check_time:.2f}s")
+            print(f"⏱️  AI or Not check took: {check_time:.2f}s")
             
-            # Parse Hive response
-            ai_generated = False
-            confidence = 0.0
+            # Parse AI or Not response
+            # Response format: {"report": {"verdict": "ai" or "human", "confidence": 0.0-1.0}}
+            verdict = data.get("report", {}).get("verdict", "unknown")
+            confidence = data.get("report", {}).get("confidence", 0.5)
             
-            if "status" in data and data["status"][0]["response"]["output"]:
-                classes = data["status"][0]["response"]["output"][0]["classes"]
-                for cls in classes:
-                    if cls["class"] == "ai_generated":
-                        confidence = cls["score"]
-                        ai_generated = confidence > 0.5
-                        break
+            ai_generated = verdict == "ai"
             
             # Determine message based on confidence
             if ai_generated:
                 message = "Likely AI-generated" if confidence > 0.8 else "Possibly AI-generated"
             else:
-                message = "Likely authentic" if confidence < 0.2 else "Uncertain"
+                message = "Likely authentic" if confidence > 0.8 else "Uncertain"
             
             return MediaCheckResponse(
                 ai_generated=ai_generated,

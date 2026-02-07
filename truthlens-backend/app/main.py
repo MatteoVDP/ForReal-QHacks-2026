@@ -38,7 +38,7 @@ print("=" * 50)
 print(f"✅ TruthLens API Ready")
 print(f"📍 Model: {settings.GEMINI_MODEL}")
 print(f"🔍 Search: Brave Search API")
-print(f"🤖 Media Detection: {'Enabled' if settings.HIVE_API_KEY else 'Disabled'}")
+print(f"🤖 Media Detection: {'Enabled (AI or Not)' if settings.AIORNOT_API_KEY else 'Disabled'}")
 print("=" * 50)
 
 
@@ -50,7 +50,7 @@ async def root():
         "version": "1.0.0",
         "features": {
             "fact_check": True,
-            "media_check": bool(settings.HIVE_API_KEY)
+            "media_check": bool(settings.AIORNOT_API_KEY)
         }
     }
 
@@ -62,7 +62,7 @@ async def health():
         "status": "healthy",
         "model": settings.GEMINI_MODEL,
         "search": "brave",
-        "media_detection": bool(settings.HIVE_API_KEY)
+        "media_detection": bool(settings.AIORNOT_API_KEY)
     }
 
 
