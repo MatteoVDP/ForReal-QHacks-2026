@@ -1,4 +1,4 @@
-"""AI media detection service using Hive API."""
+"""AI media detection service using AI or Not API."""
 import requests
 import asyncio
 import time
@@ -16,7 +16,7 @@ class MediaCheckService:
     @staticmethod
     async def check_media(media_url: str, media_type: str) -> MediaCheckResponse:
         """
-        Check if an image or video is AI-generated using Hive API.
+        Check if an image or video is AI-generated using AI or Not API.
         
         Args:
             media_url: URL of the image or video
@@ -25,56 +25,105 @@ class MediaCheckService:
         Returns:
             MediaCheckResponse with ai_generated status, confidence, and message
         """
-        if not settings.HIVE_API_KEY:
-            raise ValueError("HIVE_API_KEY not configured")
+        if not settings.AIORNOT_API_KEY:
+            raise ValueError("AIORNOT_API_KEY not configured")
+        
+        # AI or Not only supports images, not videos
+        if media_type == "video":
+            print(f"⚠️  Video detection not supported by AI or Not API")
+            return MediaCheckResponse(
+                ai_generated=False,
+                confidence=0.0,
+                media_type=media_type,
+                message="Video detection not available (images only)"
+            )
         
         try:
             print(f"Checking {media_type}: {media_url[:100]}...")
+            
+            # Validate URL
+            if not media_url or not media_url.startswith('http'):
+                raise ValueError(f"Invalid media URL: {media_url}")
+            
+            print(f"📷 Image URL: {media_url}")
+            
             check_start = time.time()
             
+            # AI or Not API uses simple Bearer token authentication
             headers = {
-                "Authorization": f"Token {settings.HIVE_API_KEY}",
+                "Authorization": f"Bearer {settings.AIORNOT_API_KEY.strip()}",
                 "Content-Type": "application/json"
             }
             
+            # AI or Not payload format
             payload = {
-                "url": media_url,
-                "classes": ["ai_generated"]
+                "object": media_url
             }
+            
+            print(f"🔑 Using AI or Not API")
+            print(f"📤 Request payload: {payload}")
+            print(f"🌐 Endpoint: {settings.AIORNOT_API_URL}")
             
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 executor,
                 lambda: requests.post(
-                    settings.HIVE_API_URL,
+                    settings.AIORNOT_API_URL,
                     headers=headers,
                     json=payload,
-                    timeout=settings.HIVE_TIMEOUT
+                    timeout=settings.AIORNOT_TIMEOUT
                 )
             )
+            
+            print(f"📥 Response status: {response.status_code}")
+            
+            if response.status_code == 403:
+                print("❌ 403 Forbidden - API key might be invalid")
+                print(f"Response body: {response.text[:500]}")
+                raise ValueError(f"AI or Not API authentication failed. Please check your API key.")
+            
+            if response.status_code == 400:
+                print("❌ 400 Bad Request - Invalid payload")
+                print(f"Response body: {response.text}")
+                raise ValueError(f"AI or Not API bad request. Response: {response.text}")
+            
             response.raise_for_status()
             data = response.json()
+            print(f"✓ Response data received:")
+            print(f"   Full response: {data}")
             
             check_time = time.time() - check_start
-            print(f"⏱️  Hive AI check took: {check_time:.2f}s")
+            print(f"⏱️  AI or Not check took: {check_time:.2f}s")
             
-            # Parse Hive response
-            ai_generated = False
-            confidence = 0.0
+            # Parse AI or Not response - correct structure
+            # Response: {"report": {"verdict": "ai"/"human", "ai": {"confidence": 0.x}, "human": {"confidence": 0.x}}}
+            verdict = "unknown"
+            confidence = 0.5
             
-            if "status" in data and data["status"][0]["response"]["output"]:
-                classes = data["status"][0]["response"]["output"][0]["classes"]
-                for cls in classes:
-                    if cls["class"] == "ai_generated":
-                        confidence = cls["score"]
-                        ai_generated = confidence > 0.5
-                        break
+            if "report" in data:
+                print(f"   Found 'report' key")
+                report = data["report"]
+                verdict = report.get("verdict", "unknown")
+                
+                # Get confidence from the correct nested structure
+                if verdict == "ai":
+                    confidence = report.get("ai", {}).get("confidence", 0.5)
+                elif verdict == "human":
+                    confidence = report.get("human", {}).get("confidence", 0.5)
+                else:
+                    print(f"   WARNING: Unknown verdict: {verdict}")
+            else:
+                print(f"   WARNING: No 'report' key found. Keys: {list(data.keys())}")
+            
+            print(f"   Parsed - Verdict: {verdict}, Confidence: {confidence:.2%}")
+            
+            ai_generated = verdict == "ai"
             
             # Determine message based on confidence
             if ai_generated:
                 message = "Likely AI-generated" if confidence > 0.8 else "Possibly AI-generated"
             else:
-                message = "Likely authentic" if confidence < 0.2 else "Uncertain"
+                message = "Likely authentic" if confidence > 0.8 else "Uncertain"
             
             return MediaCheckResponse(
                 ai_generated=ai_generated,

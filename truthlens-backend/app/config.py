@@ -16,12 +16,12 @@ class Settings:
     # API Keys
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     BRAVE_API_KEY: str = os.getenv("BRAVE_API_KEY", "")
-    HIVE_API_KEY: Optional[str] = os.getenv("HIVE_API_KEY")
+    AIORNOT_API_KEY: Optional[str] = os.getenv("AIORNOT_API_KEY")  # Replaced Hive with AI or Not
     
     # API Configuration
     GEMINI_MODEL: str = "gemini-2.0-flash-lite"
     BRAVE_SEARCH_URL: str = "https://api.search.brave.com/res/v1/web/search"
-    HIVE_API_URL: str = "https://api.thehive.ai/api/v2/task/sync"
+    AIORNOT_API_URL: str = "https://api.aiornot.com/v1/reports/image"  # AI or Not endpoint
     
     # Search Configuration
     SEARCH_RESULT_COUNT: int = 5
@@ -45,7 +45,7 @@ class Settings:
     
     # Timeouts (seconds)
     SEARCH_TIMEOUT: int = 10
-    HIVE_TIMEOUT: int = 30
+    AIORNOT_TIMEOUT: int = 30  # AI or Not timeout
     
     def validate(self):
         """Validate required configuration."""
@@ -59,8 +59,8 @@ class Settings:
         if errors:
             raise ValueError(f"Configuration errors: {', '.join(errors)}")
         
-        if not self.HIVE_API_KEY:
-            print("⚠️  HIVE_API_KEY not set - AI media detection will be unavailable")
+        if not self.AIORNOT_API_KEY:
+            print("⚠️  AIORNOT_API_KEY not set - AI media detection will be unavailable")
         
         return True
 
