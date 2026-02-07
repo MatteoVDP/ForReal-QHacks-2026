@@ -4,7 +4,7 @@ Functionality (high level):
     - Magnifying glass next to the media (super accessible), that when clicks checks if a piece of media is fact or not.
 
 Outputs:
-    - A ground truth source link
+    - A clear ground truth source link
         - Could include the direct quote
     - A label (true, false, misleading, unverifiable)
         - Alternatively, could put a confidence level based on our instructions (if they found the exact words, is the source a reliable one, etc.)
