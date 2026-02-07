@@ -1,0 +1,58 @@
+"""Fact-checking API routes."""
+from fastapi import APIRouter, HTTPException
+import time
+from app.models import FactCheckRequest, FactCheckResponse
+from app.services import FactCheckService, SearchService
+
+router = APIRouter(prefix="/api", tags=["fact-check"])
+
+
+@router.post("/fact-check", response_model=FactCheckResponse)
+async def fact_check(request: FactCheckRequest):
+    """
+    Main fact-checking endpoint.
+    
+    Process:
+    1. Search for sources using Brave Search
+    2. Synthesize fact-check result using Gemini AI
+    """
+    try:
+        tweet_text = request.text.strip()
+        
+        if not tweet_text:
+            return FactCheckResponse(
+                label="Unverifiable",
+                explanation="No text content to fact-check.",
+                sources=[],
+                confidence=0.0
+            )
+        
+        # Search for relevant sources
+        print(f"Searching for: {tweet_text[:100]}...")
+        search_start = time.time()
+        search_results = await SearchService.search_claim(tweet_text)
+        search_time = time.time() - search_start
+        print(f"⏱️  Brave search took: {search_time:.2f}s")
+        
+        if not search_results:
+            return FactCheckResponse(
+                label="Unverifiable",
+                explanation="No reliable sources found to verify this claim.",
+                sources=[],
+                confidence=0.0
+            )
+        
+        # Synthesize the fact-check using AI
+        synthesis_start = time.time()
+        result = await FactCheckService.synthesize_fact_check(
+            tweet_text, tweet_text, search_results
+        )
+        synthesis_time = time.time() - synthesis_start
+        print(f"⏱️  Gemini synthesis took: {synthesis_time:.2f}s")
+        print(f"⏱️  Total time: {search_time + synthesis_time:.2f}s")
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in fact_check: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
