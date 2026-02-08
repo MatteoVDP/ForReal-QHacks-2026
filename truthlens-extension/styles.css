@@ -13,6 +13,7 @@
   padding: 0;
   border-radius: 9999px;
   cursor: pointer;
+  background-color: rgb(21, 32, 43); /* Option A: Dim Background */
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: static;
   flex-shrink: 0;
@@ -20,10 +21,11 @@
   vertical-align: middle;
   align-self: center;
   animation: truthlens-button-appear 0.3s ease-out;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.2); /* Subtle glow for visibility */
 }
 
 .truthlens-button:hover {
-  background-color: rgba(29, 155, 240, 0.1);
+  background-color: rgb(38, 55, 70); /* Slightly lighter on hover */
   transform: scale(1.05);
 }
 
@@ -34,7 +36,7 @@
 .truthlens-icon {
   width: 18.75px;
   height: 18.75px;
-  fill: rgb(113, 118, 123);
+  fill: white; /* Option A: White Icon */
   flex-shrink: 0;
   transition: fill 0.2s ease;
 }
@@ -51,7 +53,7 @@
 }
 
 .truthlens-button:hover .truthlens-icon {
-  fill: rgb(29, 155, 240);
+  fill: white; /* Keep white on hover */
 }
 
 /* Status icon colors */
@@ -350,10 +352,10 @@
   position: absolute;
   width: 32px;
   height: 32px;
-  background: #1d9bf0;
+  background: rgb(21, 32, 43); /* Twitter Dark Blue */
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
   z-index: 2147483647;
   display: flex;
   align-items: center;
@@ -370,7 +372,7 @@
 
 .truthlens-fab:hover {
   transform: scale(1.1);
-  background: #1a8cd8;
+  background: rgb(38, 55, 70); /* Slightly lighter on hover */
 }
 
 @keyframes truthlens-pop-in {
