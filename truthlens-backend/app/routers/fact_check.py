@@ -13,8 +13,9 @@ async def fact_check(request: FactCheckRequest):
     Main fact-checking endpoint.
     
     Process:
-    1. Search for sources using Brave Search
-    2. Synthesize fact-check result using Gemini AI
+    1. Extract core claim using Gemini AI
+    2. Search for sources using Brave Search with extracted claim
+    3. Synthesize fact-check result using Gemini AI
     """
     try:
         tweet_text = request.text.strip()
@@ -27,10 +28,14 @@ async def fact_check(request: FactCheckRequest):
                 confidence=0.0
             )
         
-        # Search for relevant sources
-        print(f"Searching for: {tweet_text[:100]}...")
+        # Step 1: Extract the core claim using Gemini
+        print(f"📝 Original text: {tweet_text[:100]}...")
+        extracted_claim = await FactCheckService.extract_claim(tweet_text)
+        
+        # Step 2: Search for relevant sources using extracted claim
+        print(f"🔍 Searching for: {extracted_claim[:100]}...")
         search_start = time.time()
-        search_results = await SearchService.search_claim(tweet_text)
+        search_results = await SearchService.search_claim(extracted_claim)
         search_time = time.time() - search_start
         print(f"⏱️  Brave search took: {search_time:.2f}s")
         
@@ -42,14 +47,13 @@ async def fact_check(request: FactCheckRequest):
                 confidence=0.0
             )
         
-        # Synthesize the fact-check using AI
+        # Step 3: Synthesize the fact-check using AI with original text
         synthesis_start = time.time()
         result = await FactCheckService.synthesize_fact_check(
-            tweet_text, tweet_text, search_results
+            extracted_claim, tweet_text, search_results
         )
         synthesis_time = time.time() - synthesis_start
         print(f"⏱️  Gemini synthesis took: {synthesis_time:.2f}s")
-        print(f"⏱️  Total time: {search_time + synthesis_time:.2f}s")
         
         return result
         

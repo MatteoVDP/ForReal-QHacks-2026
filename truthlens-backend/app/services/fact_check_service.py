@@ -20,6 +20,61 @@ class FactCheckService:
     """Service for fact-checking claims using AI."""
     
     @staticmethod
+    async def extract_claim(text: str) -> str:
+        """
+        Extract the core factual claim from a tweet or text using Gemini.
+        
+        Args:
+            text: The original tweet/post text
+            
+        Returns:
+            Extracted claim as a searchable query
+        """
+        prompt = f"""
+<context>
+ROLE: Claim Extraction Specialist
+TASK: Extract the core factual claim from the text below that can be fact-checked.
+</context>
+
+<text>
+"{text}"
+</text>
+
+<instructions>
+1. Identify the main factual claim or statement (ignore opinions, questions, or commentary)
+2. Extract it as a clear, searchable query (remove hashtags, mentions, links)
+3. If multiple claims exist, extract the most significant one
+4. If no factual claim exists, return the original text
+5. Keep it concise (under 100 characters if possible)
+</instructions>
+
+<output_format>
+Return ONLY the extracted claim text, nothing else.
+</output_format>
+"""
+        
+        try:
+            loop = asyncio.get_event_loop()
+            extract_start = time.time()
+            response = await loop.run_in_executor(
+                executor,
+                lambda: model.generate_content(prompt)
+            )
+            extract_time = time.time() - extract_start
+            print(f"⏱️  Gemini claim extraction took: {extract_time:.2f}s")
+            
+            extracted = response.text.strip()
+            # Remove quotes if Gemini added them
+            extracted = extracted.strip('"').strip("'").strip()
+            
+            print(f"📝 Extracted claim: {extracted}")
+            return extracted if extracted else text
+            
+        except Exception as e:
+            print(f"Error extracting claim: {str(e)}")
+            return text  # Fallback to original text
+    
+    @staticmethod
     async def synthesize_fact_check(
         claim: str,
         original_tweet: str,
@@ -38,7 +93,7 @@ class FactCheckService:
         """
         # Format search results for the prompt
         sources_text = "\n\n".join([
-            f"Source {i+1}:\nTitle: {result.get('title', 'N/A')}\nURL: {result.get('url', 'N/A')}\nContent: {result.get('content', 'N/A')[:500]}"
+            f"Source {i+1}:\nTitle: {result.get('title', 'N/A')}\nURL: {result.get('url', 'N/A')}\nContent: {result.get('content', 'N/A')[:1000]}"
             for i, result in enumerate(search_results[:5])
         ])
         

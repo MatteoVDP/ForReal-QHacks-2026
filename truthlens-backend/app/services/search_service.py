@@ -12,6 +12,9 @@ executor = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
 class SearchService:
     """Service for searching and retrieving fact-check sources."""
     
+    # Blacklisted domains to exclude from results
+    BLACKLISTED_DOMAINS = ["wikipedia.org", "en.wikipedia.org"]
+    
     @staticmethod
     async def search_claim(claim: str) -> List[dict]:
         """
@@ -50,9 +53,14 @@ class SearchService:
             # Parse and filter results
             results = []
             if "web" in data and "results" in data["web"]:
-                # First pass: trusted domains only
+                # First pass: trusted domains only (excluding blacklisted)
                 for result in data["web"]["results"]:
                     url_lower = result.get("url", "").lower()
+                    
+                    # Skip blacklisted domains
+                    if any(domain in url_lower for domain in SearchService.BLACKLISTED_DOMAINS):
+                        continue
+                    
                     if any(domain in url_lower for domain in settings.TRUSTED_DOMAINS):
                         results.append({
                             "title": result.get("title", "N/A"),
@@ -63,10 +71,15 @@ class SearchService:
                         if len(results) >= settings.MAX_SOURCES:
                             break
                 
-                # Second pass: add general results if needed
+                # Second pass: add general results if needed (excluding blacklisted)
                 if len(results) < settings.MAX_SOURCES:
                     for result in data["web"]["results"]:
                         url_lower = result.get("url", "").lower()
+                        
+                        # Skip blacklisted domains
+                        if any(domain in url_lower for domain in SearchService.BLACKLISTED_DOMAINS):
+                            continue
+                        
                         if not any(domain in url_lower for domain in settings.TRUSTED_DOMAINS):
                             results.append({
                                 "title": result.get("title", "N/A"),
