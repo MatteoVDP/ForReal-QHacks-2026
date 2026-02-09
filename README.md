@@ -1,4 +1,4 @@
-![ForReal](image-url)
+![ForReal-logo](truthlens-extension/icons/Transparent-ForReal-logo-long-blue-cropped.png)
 
 **Real-time AI Fact-Checking & Media Verification for X (Twitter)**
 
